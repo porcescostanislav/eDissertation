@@ -573,4 +573,97 @@ router.delete('/sessions/:id', authMiddleware, profesorOnly, async (req, res) =>
   }
 });
 
+/**
+ * GET /api/profesor/sessions/:sessionId/enrolled-students
+ * Get all enrolled students for a specific session
+ */
+router.get('/sessions/:sessionId/enrolled-students', authMiddleware, profesorOnly, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Parse session ID
+    const sessionIdInt = parseInt(sessionId);
+    if (isNaN(sessionIdInt)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid session ID',
+      });
+    }
+
+    // Verify professor owns this session
+    const session = await prisma.sesiuneInscriere.findUnique({
+      where: { id: sessionIdInt },
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found',
+      });
+    }
+
+    if (session.profesorId !== req.profesor.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this session',
+      });
+    }
+
+    // Fetch enrolled students for this session
+    const enrolledStudents = await prisma.cerereDisertatie.findMany({
+      where: {
+        sesiuneId: sessionIdInt,
+        status: 'approved', // Only approved applications mean enrolled
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    console.log(`Enrolled students for session ${sessionIdInt}:`, enrolledStudents);
+
+    // Format response
+    const formattedStudents = enrolledStudents.map((app) => ({
+      applicationId: app.id,
+      studentId: app.student.id,
+      studentName: `${app.student.prenume} ${app.student.nume}`,
+      studentEmail: app.student.user?.email,
+      status: app.status,
+      enrolledDate: app.updatedAt,
+    }));
+
+    console.log(`Formatted students:`, formattedStudents);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Enrolled students retrieved successfully',
+      data: formattedStudents,
+      pagination: {
+        total: formattedStudents.length,
+      },
+    });
+  } catch (error) {
+    console.error('Enrolled students retrieval error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

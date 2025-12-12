@@ -1,8 +1,34 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { prisma } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    // Accept only PDF files
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  },
+});
 
 /**
  * Middleware to verify user is a professor
@@ -38,6 +64,89 @@ async function profesorOnly(req, res, next) {
     });
   }
 }
+
+/**
+ * GET /api/profesor/applications/:id/unsigned-template
+ * Download unsigned template for student to sign and return
+ */
+router.get('/applications/:id/unsigned-template', authMiddleware, profesorOnly, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Parse application ID
+    const appId = parseInt(id);
+    if (isNaN(appId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid application ID',
+      });
+    }
+
+    // Fetch application
+    const application = await prisma.cerereDisertatie.findUnique({
+      where: { id: appId },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
+    // Verify professor owns this application
+    if (application.profesorId !== req.profesor.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this application',
+      });
+    }
+
+    // Check if application is approved
+    if (application.status !== 'approved') {
+      return res.status(409).json({
+        success: false,
+        message: 'Unsigned template is only available for approved applications',
+      });
+    }
+
+    // Create a simple text-based template response
+    // In a real application, you might generate a PDF or return a pre-made template
+    const templateContent = `
+DISSERTATION APPLICATION FORM - UNSIGNED TEMPLATE
+
+Application ID: ${application.id}
+Student ID: ${application.studentId}
+Session ID: ${application.sesiuneId}
+
+---
+
+This is an unsigned template. Please fill in your information, print this document, sign it, 
+and upload the signed PDF version back to the application system.
+
+Student Name: ___________________________
+Date: ___________________________
+Signature: ___________________________
+
+---
+
+For questions, contact your professor.
+    `.trim();
+
+    // Set response headers to download as file
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="dissertation-template-${application.id}.txt"`);
+    
+    return res.send(templateContent);
+  } catch (error) {
+    console.error('Template retrieval error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+});
 
 /**
  * PATCH /api/profesor/applications/:id/approve
@@ -385,6 +494,8 @@ router.get('/applications', authMiddleware, profesorOnly, async (req, res) => {
       sesiune: app.sesiune,
       status: app.status,
       justificareRespingere: app.justificareRespingere,
+      fisierSemnatUrl: app.fisierSemnatUrl,
+      fisierRaspunsUrl: app.fisierRaspunsUrl,
       createdAt: app.createdAt,
       updatedAt: app.updatedAt,
     }));
@@ -489,6 +600,273 @@ router.get('/applications/:id', authMiddleware, profesorOnly, async (req, res) =
     });
   } catch (error) {
     console.error('Application detail retrieval error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/profesor/applications/:id/upload-response
+ * Upload response file for an approved application
+ */
+router.post('/applications/:id/upload-response', authMiddleware, profesorOnly, upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Parse application ID
+    const appId = parseInt(id);
+    if (isNaN(appId)) {
+      // Clean up uploaded file if exists
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid application ID',
+      });
+    }
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded',
+      });
+    }
+
+    // Fetch application
+    const application = await prisma.cerereDisertatie.findUnique({
+      where: { id: appId },
+    });
+
+    if (!application) {
+      // Clean up file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
+    // Verify professor owns this application
+    if (application.profesorId !== req.profesor.id) {
+      // Clean up file
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this application',
+      });
+    }
+
+    // Check if application is approved
+    if (application.status !== 'approved') {
+      // Clean up file
+      fs.unlinkSync(req.file.path);
+      return res.status(409).json({
+        success: false,
+        message: 'Only approved applications can have response files uploaded',
+      });
+    }
+
+    // Generate file URL
+    const fileUrl = `/uploads/${req.file.filename}`;
+
+    // Update application with file URL
+    const updatedApplication = await prisma.cerereDisertatie.update({
+      where: { id: appId },
+      data: {
+        fisierRaspunsUrl: fileUrl,
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+        sesiune: {
+          select: {
+            id: true,
+            dataInceput: true,
+            dataSfarsit: true,
+            limitaStudenti: true,
+          },
+        },
+        profesor: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Response file uploaded successfully',
+      data: {
+        id: updatedApplication.id,
+        fisierRaspunsUrl: updatedApplication.fisierRaspunsUrl,
+        updatedAt: updatedApplication.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('File upload error:', error);
+    
+    // Clean up uploaded file if exists
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (fsError) {
+        console.error('Error cleaning up file:', fsError);
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * PATCH /api/profesor/applications/:id/un-approve
+ * Reject/unapprove an approved application, requiring student to resubmit signed file
+ */
+router.patch('/applications/:id/un-approve', authMiddleware, profesorOnly, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { justificare } = req.body;
+
+    // Parse application ID
+    const appId = parseInt(id);
+    if (isNaN(appId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid application ID',
+      });
+    }
+
+    // Validation
+    if (!justificare || !justificare.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required',
+      });
+    }
+
+    // Fetch application
+    const application = await prisma.cerereDisertatie.findUnique({
+      where: { id: appId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+        sesiune: {
+          select: {
+            id: true,
+            dataInceput: true,
+            dataSfarsit: true,
+            limitaStudenti: true,
+          },
+        },
+        profesor: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
+    // Verify professor owns this application
+    if (application.profesorId !== req.profesor.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this application',
+      });
+    }
+
+    // Check if application is approved
+    if (application.status !== 'approved') {
+      return res.status(409).json({
+        success: false,
+        message: 'Only approved applications can be rejected',
+      });
+    }
+
+    // Update application: set status to rejected and clear signed file
+    const rejectedApplication = await prisma.cerereDisertatie.update({
+      where: { id: appId },
+      data: {
+        status: 'rejected',
+        justificareRespingere: justificare,
+        fisierSemnatUrl: null, // Clear the signed file so student must resubmit
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+        sesiune: {
+          select: {
+            id: true,
+            dataInceput: true,
+            dataSfarsit: true,
+            limitaStudenti: true,
+          },
+        },
+        profesor: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Application rejected successfully. Student must resubmit signed file.',
+      data: {
+        id: rejectedApplication.id,
+        studentId: rejectedApplication.studentId,
+        student: rejectedApplication.student,
+        sesiuneId: rejectedApplication.sesiuneId,
+        sesiune: rejectedApplication.sesiune,
+        profesorId: rejectedApplication.profesorId,
+        profesor: rejectedApplication.profesor,
+        status: rejectedApplication.status,
+        justificareRespingere: rejectedApplication.justificareRespingere,
+        fisierSemnatUrl: rejectedApplication.fisierSemnatUrl,
+        fisierRaspunsUrl: rejectedApplication.fisierRaspunsUrl,
+        updatedAt: rejectedApplication.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Application un-approval error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
