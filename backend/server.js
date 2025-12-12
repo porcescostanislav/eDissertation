@@ -1,10 +1,15 @@
 const express = require('express');
 const { initializePrisma, testDatabaseConnection } = require('./db');
+const { authMiddleware } = require('./middleware/auth');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Auth routes (public)
+app.use('/api/auth', authRoutes);
 
 // Database connection test endpoint
 app.get('/api/status', async (req, res) => {
@@ -28,6 +33,21 @@ app.get('/health', (req, res) => {
   res.json({ health: 'ok' });
 });
 
+// Protected route example
+app.get('/api/me', authMiddleware, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: req.user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+});
+
 // Start server
 async function startServer() {
   try {
@@ -35,8 +55,11 @@ async function startServer() {
     
     app.listen(PORT, () => {
       console.log(`✓ Server is running on http://localhost:${PORT}`);
-      console.log(`✓ API Status endpoint: http://localhost:${PORT}/api/status`);
       console.log(`✓ Health endpoint: http://localhost:${PORT}/health`);
+      console.log(`✓ Auth endpoints:`);
+      console.log(`  - POST /api/auth/register`);
+      console.log(`  - POST /api/auth/login`);
+      console.log(`✓ Protected endpoint: GET /api/me (requires auth)`);
     });
 
     // Try to initialize Prisma (non-blocking)
