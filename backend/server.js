@@ -2,6 +2,7 @@ const express = require('express');
 const { initializePrisma, testDatabaseConnection } = require('./db');
 const { authMiddleware } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
+const profesorRoutes = require('./routes/profesor');
 
 const app = express();
 const PORT = 3000;
@@ -10,6 +11,9 @@ app.use(express.json());
 
 // Auth routes (public)
 app.use('/api/auth', authRoutes);
+
+// Professor routes (protected)
+app.use('/api/profesor', profesorRoutes);
 
 // Database connection test endpoint
 app.get('/api/status', async (req, res) => {
@@ -59,6 +63,12 @@ async function startServer() {
       console.log(`✓ Auth endpoints:`);
       console.log(`  - POST /api/auth/register`);
       console.log(`  - POST /api/auth/login`);
+      console.log(`✓ Professor endpoints (protected):`);
+      console.log(`  - POST /api/profesor/sessions (create session)`);
+      console.log(`  - GET /api/profesor/sessions (list sessions)`);
+      console.log(`  - GET /api/profesor/sessions/:id (get session)`);
+      console.log(`  - PUT /api/profesor/sessions/:id (update session)`);
+      console.log(`  - DELETE /api/profesor/sessions/:id (delete session)`);
       console.log(`✓ Protected endpoint: GET /api/me (requires auth)`);
     });
 
