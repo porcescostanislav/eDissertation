@@ -1,8 +1,33 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
 const { prisma } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    // Accept only PDF files
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  },
+});
 
 /**
  * Middleware to verify user is a student
@@ -208,7 +233,7 @@ router.get('/applications', authMiddleware, studentOnly, async (req, res) => {
       studentId: req.student.id,
     };
 
-    if (status && ['pending', 'aprobat', 'respins'].includes(status)) {
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
       where.status = status;
     }
 
@@ -423,6 +448,131 @@ router.get('/sessions', authMiddleware, studentOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('Available sessions retrieval error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/student/applications/:id/upload-signed
+ * Upload signed file for an approved application
+ */
+router.post('/applications/:id/upload-signed', authMiddleware, studentOnly, upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Parse application ID
+    const appId = parseInt(id);
+    if (isNaN(appId)) {
+      // Clean up uploaded file if exists
+      if (req.file) {
+        const fs = require('fs');
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid application ID',
+      });
+    }
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded',
+      });
+    }
+
+    // Fetch application
+    const application = await prisma.cerereDisertatie.findUnique({
+      where: { id: appId },
+    });
+
+    if (!application) {
+      // Clean up file
+      const fs = require('fs');
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
+    // Verify ownership
+    if (application.studentId !== req.student.id) {
+      // Clean up file
+      const fs = require('fs');
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this application',
+      });
+    }
+
+    // Check if application is approved
+    if (application.status !== 'approved') {
+      // Clean up file
+      const fs = require('fs');
+      fs.unlinkSync(req.file.path);
+      return res.status(409).json({
+        success: false,
+        message: 'Only approved applications can have signed files uploaded',
+      });
+    }
+
+    // Generate file URL
+    const fileUrl = `/uploads/${req.file.filename}`;
+
+    // Update application with file URL
+    const updatedApplication = await prisma.cerereDisertatie.update({
+      where: { id: appId },
+      data: {
+        fisierSemnatUrl: fileUrl,
+      },
+      include: {
+        sesiune: {
+          select: {
+            id: true,
+            dataInceput: true,
+            dataSfarsit: true,
+            limitaStudenti: true,
+          },
+        },
+        profesor: {
+          select: {
+            id: true,
+            nume: true,
+            prenume: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Signed file uploaded successfully',
+      data: {
+        id: updatedApplication.id,
+        fisierSemnatUrl: updatedApplication.fisierSemnatUrl,
+        updatedAt: updatedApplication.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('File upload error:', error);
+    
+    // Clean up uploaded file if exists
+    if (req.file) {
+      const fs = require('fs');
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (fsError) {
+        console.error('Error cleaning up file:', fsError);
+      }
+    }
+
     return res.status(500).json({
       success: false,
       message: 'Internal server error',

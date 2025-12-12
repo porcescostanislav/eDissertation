@@ -70,6 +70,31 @@ export const studentService = {
       throw error.response?.data || { message: 'Failed to fetch application details' }
     }
   },
+
+  /**
+   * Upload signed file for an approved application
+   * @param {number} applicationId - Application ID
+   * @param {File} file - PDF file to upload
+   */
+  uploadSignedFile: async (applicationId, file) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await studentAPI.post(
+        `/student/applications/${applicationId}/upload-signed`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to upload signed file' }
+    }
+  },
 }
 
 export default studentService

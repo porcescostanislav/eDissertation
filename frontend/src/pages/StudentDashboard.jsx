@@ -32,6 +32,7 @@ export const StudentDashboard = () => {
   const navigate = useNavigate()
   const toast = useToast()
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const { isOpen: isUploadOpen, onOpen: onUploadOpen, onClose: onUploadClose } = useDisclosure()
   
   const [user, setUser] = useState(null)
   const [sessions, setSessions] = useState([])
@@ -40,6 +41,9 @@ export const StudentDashboard = () => {
   const [isLoadingApps, setIsLoadingApps] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedSession, setSelectedSession] = useState(null)
+  const [selectedApplicationForUpload, setSelectedApplicationForUpload] = useState(null)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
     const savedUser = authService.getUser()
@@ -152,10 +156,8 @@ export const StudentDashboard = () => {
     switch (status) {
       case 'pending':
         return 'orange'
-      case 'aprobat':
       case 'approved':
         return 'green'
-      case 'respins':
       case 'rejected':
         return 'red'
       default:
@@ -165,10 +167,8 @@ export const StudentDashboard = () => {
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'aprobat':
       case 'approved':
         return 'Approved'
-      case 'respins':
       case 'rejected':
         return 'Rejected'
       case 'pending':
@@ -189,6 +189,75 @@ export const StudentDashboard = () => {
   const handleLogout = () => {
     authService.logout()
     navigate('/login')
+  }
+
+  const handleUploadSignedFile = (application) => {
+    setSelectedApplicationForUpload(application)
+    setUploadFile(null)
+    onUploadOpen()
+  }
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: 'Invalid file type',
+          description: 'Please upload a PDF file',
+          status: 'error',
+          duration: 4,
+          isClosable: true,
+        })
+        return
+      }
+      setUploadFile(file)
+    }
+  }
+
+  const handleSubmitSignedFile = async () => {
+    if (!selectedApplicationForUpload || !uploadFile) {
+      toast({
+        title: 'Missing file',
+        description: 'Please select a PDF file to upload',
+        status: 'error',
+        duration: 4,
+        isClosable: true,
+      })
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const response = await studentService.uploadSignedFile(
+        selectedApplicationForUpload.id,
+        uploadFile
+      )
+
+      if (response.success) {
+        toast({
+          title: 'File uploaded successfully',
+          description: 'Your signed file has been uploaded',
+          status: 'success',
+          duration: 4,
+          isClosable: true,
+        })
+
+        // Reload applications
+        loadApplications()
+        onUploadClose()
+      }
+    } catch (error) {
+      toast({
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload signed file',
+        status: 'error',
+        duration: 5,
+        isClosable: true,
+      })
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   if (!user) {
@@ -263,10 +332,55 @@ export const StudentDashboard = () => {
                       {getStatusLabel(app.status)}
                     </Badge>
                   </HStack>
-                  {app.status === 'respins' && app.justificareRespingere && (
+                  {app.status === 'rejected' && app.justificareRespingere && (
                     <Box mt={3} p={2} bg="red.100" borderRadius="md" borderLeft="4px" borderColor="red.500">
                       <Text fontSize="sm" fontWeight="bold" color="red.800">Rejection Reason:</Text>
                       <Text fontSize="sm" color="red.700">{app.justificareRespingere}</Text>
+                    </Box>
+                  )}
+                  {app.status === 'approved' && (
+                    <Box mt={4} pt={4} borderTop="1px solid" borderColor="blue.300">
+                      <Heading size="xs" mb={3} color="green.700">
+                        ✓ Application Approved
+                      </Heading>
+                      <VStack spacing={3} align="start">
+                        {app.fisierSemnatUrl ? (
+                          <Box>
+                            <Text fontSize="sm" fontWeight="bold" color="gray.700" mb={2}>
+                              Signed File:
+                            </Text>
+                            <HStack spacing={2}>
+                              <Text fontSize="sm" color="green.600">
+                                ✓ File uploaded: {new Date(app.updatedAt).toLocaleDateString()}
+                              </Text>
+                              <Button
+                                size="sm"
+                                colorScheme="blue"
+                                variant="outline"
+                                as="a"
+                                href={`http://localhost:3000${app.fisierSemnatUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Download
+                              </Button>
+                            </HStack>
+                          </Box>
+                        ) : (
+                          <Box w="full">
+                            <Text fontSize="sm" fontWeight="bold" color="gray.700" mb={2}>
+                              Upload Your Signed File:
+                            </Text>
+                            <Button
+                              size="sm"
+                              colorScheme="green"
+                              onClick={() => handleUploadSignedFile(app)}
+                            >
+                              Upload Signed File
+                            </Button>
+                          </Box>
+                        )}
+                      </VStack>
                     </Box>
                   )}
                 </Box>
@@ -404,6 +518,85 @@ export const StudentDashboard = () => {
                 isLoading={isSubmitting}
               >
                 Confirm Application
+              </Button>
+            </HStack>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Signed File Upload Modal */}
+      <Modal isOpen={isUploadOpen} onClose={onUploadClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Upload Signed File</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {selectedApplicationForUpload && (
+              <VStack spacing={4} align="start">
+                <Box>
+                  <Text fontWeight="bold" mb={2}>
+                    Upload your signed dissertation file
+                  </Text>
+                  <Box p={4} bg="green.50" borderRadius="md" borderLeft="4px" borderColor="green.500">
+                    <Text fontSize="sm" mb={2}>
+                      <strong>Professor:</strong> {selectedApplicationForUpload.profesor?.prenume || 'Unknown'} {selectedApplicationForUpload.profesor?.nume || 'Professor'}
+                    </Text>
+                    <Text fontSize="sm">
+                      <strong>Status:</strong> Approved
+                    </Text>
+                  </Box>
+                </Box>
+                <Box w="full" p={4} borderWidth={2} borderStyle="dashed" borderColor="blue.300" borderRadius="md" bg="blue.50" textAlign="center">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    id="signed-file-input"
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="signed-file-input" style={{ cursor: 'pointer', display: 'block' }}>
+                    {uploadFile ? (
+                      <VStack spacing={2}>
+                        <Text fontSize="sm" fontWeight="bold" color="green.700">
+                          ✓ {uploadFile.name}
+                        </Text>
+                        <Text fontSize="xs" color="gray.600">
+                          Click to change file
+                        </Text>
+                      </VStack>
+                    ) : (
+                      <VStack spacing={2}>
+                        <Text fontSize="sm" fontWeight="bold" color="blue.700">
+                          Click to upload PDF file
+                        </Text>
+                        <Text fontSize="xs" color="gray.600">
+                          or drag and drop
+                        </Text>
+                      </VStack>
+                    )}
+                  </label>
+                </Box>
+                <Alert status="info" borderRadius="md" w="full">
+                  <AlertIcon />
+                  <Text fontSize="sm">
+                    Only PDF files are accepted. Make sure your file is properly signed.
+                  </Text>
+                </Alert>
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <HStack spacing={3}>
+              <Button variant="outline" onClick={onUploadClose}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="green"
+                onClick={handleSubmitSignedFile}
+                isLoading={isUploading}
+                isDisabled={!uploadFile}
+              >
+                Upload File
               </Button>
             </HStack>
           </ModalFooter>

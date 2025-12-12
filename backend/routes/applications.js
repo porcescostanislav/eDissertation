@@ -141,7 +141,7 @@ router.patch('/applications/:id/approve', authMiddleware, profesorOnly, async (r
       });
 
       // Auto-reject all other pending applications for this student with other professors
-      const otherPendingApps = await tx.cerereDisertatie.findMany({
+      await tx.cerereDisertatie.updateMany({
         where: {
           studentId: application.studentId,
           status: 'pending',
@@ -149,23 +149,11 @@ router.patch('/applications/:id/approve', authMiddleware, profesorOnly, async (r
             id: appId,
           },
         },
+        data: {
+          status: 'rejected',
+          justificareRespingere: 'Auto-rejected: Student approved by another professor',
+        },
       });
-
-      if (otherPendingApps.length > 0) {
-        await tx.cerereDisertatie.updateMany({
-          where: {
-            studentId: application.studentId,
-            status: 'pending',
-            NOT: {
-              id: appId,
-            },
-          },
-          data: {
-            status: 'rejected',
-            justificareRespingere: 'Auto-rejected: Student approved by another professor',
-          },
-        });
-      }
 
       return approved;
     });
@@ -182,7 +170,6 @@ router.patch('/applications/:id/approve', authMiddleware, profesorOnly, async (r
         profesorId: approvedApplication.profesorId,
         profesor: approvedApplication.profesor,
         status: approvedApplication.status,
-        rejectedOtherApplications: otherPendingApps.length,
         updatedAt: approvedApplication.updatedAt,
       },
     });
