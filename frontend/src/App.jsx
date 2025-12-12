@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Box, Container, VStack, Heading } from '@chakra-ui/react'
 import './App.css'
 
 function App() {
@@ -17,29 +18,27 @@ function App() {
   }
 
   return (
-    <div className="container">
-      <h1>React + Vite Frontend</h1>
-      
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
+    <Container maxW="container.lg" py={8}>
+      <VStack spacing={6}>
+        <Heading as="h1" size="2xl">React + Vite + Chakra UI</Heading>
+        
+        <Box borderWidth={1} borderRadius="lg" p={6} w="full">
+          <button onClick={() => setCount((count) => count + 1)}>
+            count is {count}
+          </button>
+          <p>
+            Edit <code>src/App.jsx</code> and save to test HMR
+          </p>
+        </Box>
 
-      <div className="card">
-        <button onClick={fetchFromBackend}>
-          Call Backend API
-        </button>
-        {message && <p>{message}</p>}
-      </div>
-
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </div>
+        <Box borderWidth={1} borderRadius="lg" p={6} w="full">
+          <button onClick={fetchFromBackend}>
+            Call Backend API
+          </button>
+          {message && <p>{message}</p>}
+        </Box>
+      </VStack>
+    </Container>
   )
 }
 
