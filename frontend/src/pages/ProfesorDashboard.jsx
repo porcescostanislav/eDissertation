@@ -37,6 +37,7 @@ export const ProfesorDashboard = () => {
   const toast = useToast()
   const { isOpen: isSessionOpen, onOpen: onSessionOpen, onClose: onSessionClose } = useDisclosure()
   const { isOpen: isRejectOpen, onOpen: onRejectOpen, onClose: onRejectClose } = useDisclosure()
+  const { isOpen: isTerminateOpen, onOpen: onTerminateOpen, onClose: onTerminateClose } = useDisclosure()
 
   const [user, setUser] = useState(null)
   const [profesorData, setProfessorData] = useState(null)
@@ -57,6 +58,8 @@ export const ProfesorDashboard = () => {
   const [selectedApplication, setSelectedApplication] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectErrors, setRejectErrors] = useState({})
+  const [selectedSessionForTerminate, setSelectedSessionForTerminate] = useState(null)
+  const [isTerminating, setIsTerminating] = useState(false)
 
   useEffect(() => {
     const savedUser = authService.getUser()
@@ -315,6 +318,44 @@ export const ProfesorDashboard = () => {
     navigate('/login')
   }
 
+  const handleTerminateSessionClick = (session) => {
+    setSelectedSessionForTerminate(session)
+    onTerminateOpen()
+  }
+
+  const handleConfirmTerminateSession = async () => {
+    if (!selectedSessionForTerminate) return
+
+    setIsTerminating(true)
+    try {
+      const response = await profesorService.deleteSession(selectedSessionForTerminate.id)
+
+      if (response.success) {
+        toast({
+          title: 'Session terminated',
+          description: 'The session has been successfully terminated',
+          status: 'success',
+          duration: 4,
+          isClosable: true,
+        })
+
+        // Reload sessions
+        loadSessions()
+        onTerminateClose()
+      }
+    } catch (error) {
+      toast({
+        title: 'Error terminating session',
+        description: error.message || 'Failed to terminate session',
+        status: 'error',
+        duration: 5,
+        isClosable: true,
+      })
+    } finally {
+      setIsTerminating(false)
+    }
+  }
+
   if (!user) {
     return null
   }
@@ -352,7 +393,7 @@ export const ProfesorDashboard = () => {
               </GridItem>
               {profesorData && (
                 <GridItem>
-                  <Text fontSize="sm" color="gray.600">Available Student Limit</Text>
+                  <Text fontSize="sm" color="gray.600">Max Student Limit</Text>
                   <Text fontWeight="bold">{profesorData.limitaStudenti || 0}</Text>
                 </GridItem>
               )}
@@ -388,9 +429,21 @@ export const ProfesorDashboard = () => {
                   <VStack align="start" spacing={3}>
                     <HStack justify="space-between" w="full">
                       <Heading size="sm">Session #{session.id}</Heading>
-                      <Badge colorScheme="blue">Active</Badge>
+                      <HStack spacing={2}>
+                        <Badge colorScheme="blue">Active</Badge>
+                        <Button
+                          size="sm"
+                          colorScheme="red"
+                          variant="outline"
+                          onClick={() => handleTerminateSessionClick(session)}
+                          isDisabled={session.enrolledCount > 0}
+                          title={session.enrolledCount > 0 ? `Cannot delete session with ${session.enrolledCount} student(s) enrolled` : 'Click to terminate session'}
+                        >
+                          Terminate
+                        </Button>
+                      </HStack>
                     </HStack>
-                    <Grid templateColumns="repeat(3, 1fr)" gap={4} w="full">
+                    <Grid templateColumns="repeat(4, 1fr)" gap={4} w="full">
                       <GridItem>
                         <Text fontSize="sm" color="gray.600">Start Date</Text>
                         <Text fontWeight="bold">
@@ -406,6 +459,10 @@ export const ProfesorDashboard = () => {
                       <GridItem>
                         <Text fontSize="sm" color="gray.600">Student Limit</Text>
                         <Text fontWeight="bold">{session.limitaStudenti} students</Text>
+                      </GridItem>
+                      <GridItem>
+                        <Text fontSize="sm" color="gray.600">Enrolled</Text>
+                        <Text fontWeight="bold">{session.enrolledCount} / {session.limitaStudenti}</Text>
                       </GridItem>
                     </Grid>
                   </VStack>
@@ -632,6 +689,56 @@ export const ProfesorDashboard = () => {
                 isLoading={isProcessingApp}
               >
                 Reject Application
+              </Button>
+            </HStack>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Terminate Session Modal */}
+      <Modal isOpen={isTerminateOpen} onClose={onTerminateClose} isCentered size="md">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Terminate Session</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {selectedSessionForTerminate && (
+              <VStack spacing={4} align="start">
+                <Alert status="warning" borderRadius="md">
+                  <AlertIcon />
+                  <Box>
+                    <Text fontWeight="bold">Are you sure?</Text>
+                    <Text fontSize="sm">
+                      This will permanently delete the session and all associated application data. This action cannot be undone.
+                    </Text>
+                  </Box>
+                </Alert>
+                <Box p={4} bg="gray.50" borderRadius="md" w="full">
+                  <Text fontSize="sm" fontWeight="bold" mb={2}>Session Details:</Text>
+                  <Text fontSize="sm" mb={1}>
+                    <strong>Session ID:</strong> #{selectedSessionForTerminate.id}
+                  </Text>
+                  <Text fontSize="sm" mb={1}>
+                    <strong>Start:</strong> {new Date(selectedSessionForTerminate.dataInceput).toLocaleDateString()}
+                  </Text>
+                  <Text fontSize="sm">
+                    <strong>End:</strong> {new Date(selectedSessionForTerminate.dataSfarsit).toLocaleDateString()}
+                  </Text>
+                </Box>
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <HStack spacing={3}>
+              <Button variant="outline" onClick={onTerminateClose}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={handleConfirmTerminateSession}
+                isLoading={isTerminating}
+              >
+                Terminate Session
               </Button>
             </HStack>
           </ModalFooter>

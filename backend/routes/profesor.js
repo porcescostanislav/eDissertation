@@ -550,7 +550,7 @@ router.delete('/sessions/:id', authMiddleware, profesorOnly, async (req, res) =>
     if (session._count.cerereDisertatie > 0) {
       return res.status(409).json({
         success: false,
-        message: `Cannot delete session with ${session._count.cerereDisertatie} enrollment(s)`,
+        message: `Cannot delete session with ${session._count.cerereDisertatie} student(s) enrolled. Please contact an administrator to force delete this session.`,
       });
     }
 

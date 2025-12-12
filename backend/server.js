@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 const { initializePrisma, testDatabaseConnection } = require('./db');
 const { authMiddleware } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
@@ -10,6 +12,12 @@ const applicationsRoutes = require('./routes/applications');
 const app = express();
 const PORT = 3000;
 
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Enable CORS for development
 app.use(cors({
   origin: 'http://localhost:5173',
@@ -19,6 +27,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Auth routes (public)
 app.use('/api/auth', authRoutes);
@@ -96,6 +107,7 @@ async function startServer() {
       console.log(`  - GET /api/student/applications (list applications)`);
       console.log(`  - GET /api/student/applications/:id (get application)`);
       console.log(`  - GET /api/student/sessions (list available sessions)`);
+      console.log(`  - POST /api/student/applications/:id/upload-signed (upload signed file)`);
       console.log(`✓ Protected endpoint: GET /api/me (requires auth)`);
     });
 
