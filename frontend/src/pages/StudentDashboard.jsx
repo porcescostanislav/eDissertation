@@ -322,7 +322,7 @@ export const StudentDashboard = () => {
                   <HStack justify="space-between" align="start" mb={2}>
                     <VStack align="start" spacing={1}>
                       <Heading size="sm">
-                        Prof. {app.sesiune?.profesor?.prenume || 'Unknown'} {app.sesiune?.profesor?.nume || 'Professor'}
+                        Prof. {app.profesor?.prenume || 'Unknown'} {app.profesor?.nume || 'Professor'}
                       </Heading>
                       <Text fontSize="sm" color="gray.600">
                         Session: {app.sesiune?.dataInceput ? new Date(app.sesiune.dataInceput).toLocaleDateString() : 'N/A'} - {app.sesiune?.dataSfarsit ? new Date(app.sesiune.dataSfarsit).toLocaleDateString() : 'N/A'}

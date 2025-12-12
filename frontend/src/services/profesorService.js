@@ -142,6 +142,90 @@ export const profesorService = {
       throw error.response?.data || { message: 'Failed to reject application' }
     }
   },
+
+  /**
+   * Download unsigned template for application
+   * @param {number} applicationId - Application ID
+   */
+  downloadUnsignedTemplate: async (applicationId) => {
+    try {
+      const response = await profesorAPI.get(
+        `/profesor/applications/${applicationId}/unsigned-template`,
+        {
+          responseType: 'blob', // Important for file download
+        }
+      )
+      
+      // Create a blob URL and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `dissertation-template-${applicationId}.txt`)
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      return { success: true }
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to download template' }
+    }
+  },
+
+  /**
+   * Upload response file for an approved application
+   * @param {number} applicationId - Application ID
+   * @param {File} file - PDF file to upload
+   */
+  uploadResponseFile: async (applicationId, file) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await profesorAPI.post(
+        `/profesor/applications/${applicationId}/upload-response`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to upload response file' }
+    }
+  },
+
+  /**
+   * Reject/unapprove an approved application
+   * @param {number} applicationId - Application ID
+   * @param {string} justificare - Rejection reason
+   */
+  unapproveApplication: async (applicationId, justificare) => {
+    try {
+      const response = await profesorAPI.patch(
+        `/profesor/applications/${applicationId}/un-approve`,
+        { justificare }
+      )
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to reject application' }
+    }
+  },
+
+  /**
+   * Get enrolled students for a specific session
+   */
+  getEnrolledStudents: async (sessionId) => {
+    try {
+      const response = await profesorAPI.get(`/profesor/sessions/${sessionId}/enrolled-students`)
+      return response.data
+    } catch (error) {
+      console.error('getEnrolledStudents error:', error)
+      throw error.response?.data || new Error(error.message || 'Failed to fetch enrolled students')
+    }
+  },
 }
 
 export default profesorService
