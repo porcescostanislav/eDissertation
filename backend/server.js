@@ -4,6 +4,7 @@ const { authMiddleware } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const profesorRoutes = require('./routes/profesor');
 const studentRoutes = require('./routes/student');
+const applicationsRoutes = require('./routes/applications');
 
 const app = express();
 const PORT = 3000;
@@ -18,6 +19,9 @@ app.use('/api/profesor', profesorRoutes);
 
 // Student routes (protected)
 app.use('/api/student', studentRoutes);
+
+// Applications routes (protected - professor)
+app.use('/api/profesor', applicationsRoutes);
 
 // Database connection test endpoint
 app.get('/api/status', async (req, res) => {
@@ -73,6 +77,11 @@ async function startServer() {
       console.log(`  - GET /api/profesor/sessions/:id (get session)`);
       console.log(`  - PUT /api/profesor/sessions/:id (update session)`);
       console.log(`  - DELETE /api/profesor/sessions/:id (delete session)`);
+      console.log(`✓ Professor application endpoints (protected):`);
+      console.log(`  - GET /api/profesor/applications (list applications)`);
+      console.log(`  - GET /api/profesor/applications/:id (get application)`);
+      console.log(`  - PATCH /api/profesor/applications/:id/approve (approve)`);
+      console.log(`  - PATCH /api/profesor/applications/:id/reject (reject)`);
       console.log(`✓ Student endpoints (protected):`);
       console.log(`  - POST /api/student/applications (submit application)`);
       console.log(`  - GET /api/student/applications (list applications)`);

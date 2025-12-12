@@ -102,8 +102,8 @@ model CerereDisertatie {
 
 enum Status {
   pending
-  aprobat
-  respins
+  approved
+  rejected
   
   @@map("CerereDisertatie_status")
 }
