@@ -1,0 +1,24 @@
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.card {
+  padding: 2em;
+  margin: 2em 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+code {
+  background-color: #1a1a1a;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+.read-the-docs {
+  color: #888;
+}
