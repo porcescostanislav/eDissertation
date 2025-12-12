@@ -62,9 +62,18 @@ export const RegisterPage = () => {
       )
 
       if (response.success) {
-        // Save token and user info
+        // Save token
         authService.saveToken(response.data.token)
-        authService.saveUser(response.data.user)
+        
+        // Create normalized user object from response data
+        const userInfo = {
+          userId: response.data.userId,
+          email: response.data.email,
+          role: response.data.role,
+          nome: formData.prenume,
+          prenume: formData.nume,
+        }
+        authService.saveUser(userInfo)
 
         toast({
           title: 'Account created successfully',
@@ -75,7 +84,7 @@ export const RegisterPage = () => {
         })
 
         // Redirect based on role
-        const redirectPath = response.data.user.role === 'profesor' 
+        const redirectPath = response.data.role === 'profesor' 
           ? '/profesor/dashboard' 
           : '/student/dashboard'
         navigate(redirectPath)

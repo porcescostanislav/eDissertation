@@ -52,9 +52,18 @@ export const LoginPage = () => {
       const response = await authService.login(formData.email, formData.password)
 
       if (response.success) {
-        // Save token and user info
+        // Save token
         authService.saveToken(response.data.token)
-        authService.saveUser(response.data.user)
+        
+        // Create normalized user object from response data
+        const userInfo = {
+          userId: response.data.userId,
+          email: response.data.email,
+          role: response.data.role,
+          nome: response.data.student?.prenume || response.data.profesor?.prenume || '',
+          prenume: response.data.student?.nume || response.data.profesor?.nume || '',
+        }
+        authService.saveUser(userInfo)
 
         toast({
           title: 'Login successful',
@@ -65,7 +74,7 @@ export const LoginPage = () => {
         })
 
         // Redirect based on role
-        const redirectPath = response.data.user.role === 'profesor' 
+        const redirectPath = response.data.role === 'profesor' 
           ? '/profesor/dashboard' 
           : '/student/dashboard'
         navigate(redirectPath)

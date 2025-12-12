@@ -46,7 +46,7 @@ export const ProfesorDashboard = () => {
           <Heading as="h1" size="2xl" mb={2}>
             Professor Dashboard
           </Heading>
-          <Text color="gray.600">Welcome, Prof. {user.prenume} {user.nume}!</Text>
+          <Text color="gray.600">Welcome, Prof. {user.nome} {user.prenume}!</Text>
         </Box>
 
         <Alert status="info" borderRadius="md">
@@ -61,7 +61,7 @@ export const ProfesorDashboard = () => {
           <VStack spacing={4} align="start">
             <Heading size="md">Account Information</Heading>
             <Text><strong>Email:</strong> {user.email}</Text>
-            <Text><strong>Name:</strong> {user.prenume} {user.nume}</Text>
+            <Text><strong>Name:</strong> {user.nome} {user.prenume}</Text>
             <Text><strong>Role:</strong> {user.role}</Text>
           </VStack>
         </Box>
