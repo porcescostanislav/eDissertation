@@ -23,6 +23,7 @@ export const RegisterPage = () => {
     nume: '',
     prenume: '',
     role: '',
+    limitaStudenti: '',
   })
   const [errors, setErrors] = useState({})
 
@@ -58,7 +59,8 @@ export const RegisterPage = () => {
         formData.password,
         formData.nume,
         formData.prenume,
-        formData.role
+        formData.role,
+        formData.limitaStudenti
       )
 
       if (response.success) {
@@ -72,6 +74,8 @@ export const RegisterPage = () => {
           role: response.data.role,
           nome: formData.prenume,
           prenume: formData.nume,
+          profesor: response.data.profesor || null,
+          student: response.data.student || null,
         }
         authService.saveUser(userInfo)
 
@@ -90,9 +94,15 @@ export const RegisterPage = () => {
         navigate(redirectPath)
       }
     } catch (error) {
+      // Extract error message from Axios error response structure
+      const errorMessage = 
+        error.response?.data?.message ||    // Backend error message (HTTP 4xx)
+        error.message ||                     // Network or Error object message
+        'An error occurred during registration'  // Default fallback
+      
       toast({
         title: 'Registration failed',
-        description: error.message || 'An error occurred during registration',
+        description: errorMessage,
         status: 'error',
         duration: 5,
         isClosable: true,
@@ -176,6 +186,18 @@ export const RegisterPage = () => {
                 </Text>
               )}
             </Box>
+
+            {formData.role === 'profesor' && (
+              <InputField
+                label="Max Students"
+                name="limitaStudenti"
+                type="number"
+                placeholder="e.g., 5"
+                value={formData.limitaStudenti}
+                onChange={handleChange}
+                error={errors.limitaStudenti}
+              />
+            )}
 
             <InputField
               label="Password"

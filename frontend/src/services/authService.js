@@ -23,9 +23,10 @@ export const authService = {
    * @param {string} nume - Last name
    * @param {string} prenume - First name
    * @param {string} role - 'student' or 'profesor'
+   * @param {number} limitaStudenti - Max students (for profesor only)
    * @returns {Promise} Response with token and user data
    */
-  register: async (email, password, nume, prenume, role) => {
+  register: async (email, password, nume, prenume, role, limitaStudenti) => {
     try {
       const response = await authAPI.post('/auth/register', {
         email,
@@ -33,10 +34,12 @@ export const authService = {
         nume,
         prenume,
         role,
+        limitaStudenti: limitaStudenti ? parseInt(limitaStudenti) : 0,
       })
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Registration failed' }
+      // Re-throw the Axios error to preserve error.response structure
+      throw error
     }
   },
 
@@ -54,7 +57,8 @@ export const authService = {
       })
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Login failed' }
+      // Re-throw the Axios error to preserve error.response structure
+      throw error
     }
   },
 

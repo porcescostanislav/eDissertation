@@ -117,7 +117,10 @@ export const StudentDashboard = () => {
 
     setIsSubmitting(true)
     try {
-      const response = await studentService.submitApplication(selectedSession.id)
+      const response = await studentService.submitApplication(
+        selectedSession.id,
+        selectedSession.profesorId
+      )
       
       if (response.success) {
         toast({
@@ -250,10 +253,10 @@ export const StudentDashboard = () => {
                   <HStack justify="space-between" align="start" mb={2}>
                     <VStack align="start" spacing={1}>
                       <Heading size="sm">
-                        Prof. {app.sesiune.profesor.prenume} {app.sesiune.profesor.nume}
+                        Prof. {app.sesiune?.profesor?.prenume || 'Unknown'} {app.sesiune?.profesor?.nume || 'Professor'}
                       </Heading>
                       <Text fontSize="sm" color="gray.600">
-                        Session: {new Date(app.sesiune.dataInceput).toLocaleDateString()} - {new Date(app.sesiune.dataSfarsit).toLocaleDateString()}
+                        Session: {app.sesiune?.dataInceput ? new Date(app.sesiune.dataInceput).toLocaleDateString() : 'N/A'} - {app.sesiune?.dataSfarsit ? new Date(app.sesiune.dataSfarsit).toLocaleDateString() : 'N/A'}
                       </Text>
                     </VStack>
                     <Badge colorScheme={getStatusColor(app.status)} fontSize="md" px={3} py={1}>
@@ -309,7 +312,7 @@ export const StudentDashboard = () => {
                         <VStack align="start" spacing={3}>
                           <Box>
                             <Heading size="md">
-                              Prof. {session.profesor.prenume} {session.profesor.nume}
+                              Prof. {session.profesor?.prenume || 'Unknown'} {session.profesor?.nume || 'Professor'}
                             </Heading>
                             <Text fontSize="sm" color="gray.600" mt={1}>
                               Student Limit: {session.limitaStudenti}
@@ -371,10 +374,10 @@ export const StudentDashboard = () => {
                   </Text>
                   <Box p={4} bg="blue.50" borderRadius="md" borderLeft="4px" borderColor="blue.500">
                     <Text fontSize="sm" mb={2}>
-                      <strong>Professor:</strong> {selectedSession.profesor.prenume} {selectedSession.profesor.nume}
+                      <strong>Professor:</strong> {selectedSession.profesor?.prenume || 'Unknown'} {selectedSession.profesor?.nume || 'Professor'}
                     </Text>
                     <Text fontSize="sm" mb={2}>
-                      <strong>Session Period:</strong> {new Date(selectedSession.dataInceput).toLocaleDateString()} - {new Date(selectedSession.dataSfarsit).toLocaleDateString()}
+                      <strong>Session Period:</strong> {selectedSession.dataInceput ? new Date(selectedSession.dataInceput).toLocaleDateString() : 'N/A'} - {selectedSession.dataSfarsit ? new Date(selectedSession.dataSfarsit).toLocaleDateString() : 'N/A'}
                     </Text>
                     <Text fontSize="sm">
                       <strong>Student Limit:</strong> {selectedSession.limitaStudenti}
