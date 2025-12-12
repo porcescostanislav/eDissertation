@@ -43,12 +43,14 @@ export const studentService = {
   /**
    * Submit an application to a session
    * @param {number} sesiuneId - Session ID
+   * @param {number} profesorId - Professor ID
    * @returns {Promise} Response with application data
    */
-  submitApplication: async (sesiuneId) => {
+  submitApplication: async (sesiuneId, profesorId) => {
     try {
       const response = await studentAPI.post('/student/applications', {
         sesiuneId,
+        profesorId,
       })
       return response.data
     } catch (error) {

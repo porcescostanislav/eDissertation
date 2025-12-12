@@ -6,6 +6,8 @@ import {
   Box,
   Heading,
   Text,
+  Alert,
+  AlertIcon,
   useToast,
 } from '@chakra-ui/react'
 import { InputField, PrimaryButton } from '../components'
@@ -16,6 +18,7 @@ export const LoginPage = () => {
   const navigate = useNavigate()
   const toast = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -40,6 +43,9 @@ export const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    // Clear previous error
+    setLoginError('')
+
     // Validate form
     const validation = validateLoginForm(formData)
     if (!validation.isValid) {
@@ -51,42 +57,42 @@ export const LoginPage = () => {
     try {
       const response = await authService.login(formData.email, formData.password)
 
-      if (response.success) {
-        // Save token
-        authService.saveToken(response.data.token)
-        
-        // Create normalized user object from response data
-        const userInfo = {
-          userId: response.data.userId,
-          email: response.data.email,
-          role: response.data.role,
-          nome: response.data.student?.prenume || response.data.profesor?.prenume || '',
-          prenume: response.data.student?.nume || response.data.profesor?.nume || '',
-        }
-        authService.saveUser(userInfo)
-
-        toast({
-          title: 'Login successful',
-          description: 'Welcome back!',
-          status: 'success',
-          duration: 3,
-          isClosable: true,
-        })
-
-        // Redirect based on role
-        const redirectPath = response.data.role === 'profesor' 
-          ? '/profesor/dashboard' 
-          : '/student/dashboard'
-        navigate(redirectPath)
+      // Save token
+      authService.saveToken(response.data.token)
+      
+      // Create normalized user object from response data
+      const userInfo = {
+        userId: response.data.userId,
+        email: response.data.email,
+        role: response.data.role,
+        nome: response.data.student?.prenume || response.data.profesor?.prenume || '',
+        prenume: response.data.student?.nume || response.data.profesor?.nume || '',
+        profesor: response.data.profesor || null,
+        student: response.data.student || null,
       }
-    } catch (error) {
+      authService.saveUser(userInfo)
+
       toast({
-        title: 'Login failed',
-        description: error.message || 'Invalid email or password',
-        status: 'error',
-        duration: 5,
+        title: 'Login successful',
+        description: 'Welcome back!',
+        status: 'success',
+        duration: 3,
         isClosable: true,
       })
+
+      // Redirect based on role
+      const redirectPath = response.data.role === 'profesor' 
+        ? '/profesor/dashboard' 
+        : '/student/dashboard'
+      navigate(redirectPath)
+    } catch (error) {
+      // Extract error message from Axios error response structure
+      const errorMessage = 
+        error.response?.data?.message ||    // Backend error message (HTTP 4xx)
+        error.message ||                     // Network or Error object message
+        'Invalid email or password'          // Default fallback
+      
+      setLoginError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -114,6 +120,13 @@ export const LoginPage = () => {
           boxShadow="sm"
         >
           <VStack spacing={6}>
+            {loginError && (
+              <Alert status="error" borderRadius="md" mb={2}>
+                <AlertIcon />
+                {loginError}
+              </Alert>
+            )}
+            
             <InputField
               label="Email"
               name="email"
