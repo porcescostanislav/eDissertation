@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const { initializePrisma, testDatabaseConnection } = require('./db');
 const { authMiddleware } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
@@ -8,6 +9,14 @@ const applicationsRoutes = require('./routes/applications');
 
 const app = express();
 const PORT = 3000;
+
+// Enable CORS for development
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use(express.json());
 
