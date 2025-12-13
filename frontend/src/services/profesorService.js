@@ -29,7 +29,8 @@ export const profesorService = {
       })
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to create session' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to create session')
     }
   },
 
@@ -81,7 +82,8 @@ export const profesorService = {
       const response = await profesorAPI.delete(`/profesor/sessions/${sessionId}`)
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to delete session' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to delete session')
     }
   },
 
@@ -122,7 +124,8 @@ export const profesorService = {
       )
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to approve application' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to approve application')
     }
   },
 
@@ -139,7 +142,8 @@ export const profesorService = {
       )
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to reject application' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to reject application')
     }
   },
 

@@ -72,6 +72,7 @@ export const ProfesorDashboard = () => {
   const [rejectErrors, setRejectErrors] = useState({})
   const [selectedSessionForTerminate, setSelectedSessionForTerminate] = useState(null)
   const [isTerminating, setIsTerminating] = useState(false)
+  const [approvalsError, setApprovalsError] = useState('')
 
   useEffect(() => {
     const savedUser = authService.getUser()
@@ -93,19 +94,6 @@ export const ProfesorDashboard = () => {
     // Load sessions and applications
     loadSessions()
     loadApplications()
-
-    // Set up auto-refresh for approved applications every 10 seconds
-    const refreshInterval = setInterval(() => {
-      profesorService.getApplications('approved').then(response => {
-        if (response.success) {
-          setApprovedApplications(response.data || [])
-        }
-      }).catch(err => {
-        console.error('Auto-refresh failed:', err)
-      })
-    }, 10000)
-
-    return () => clearInterval(refreshInterval)
   }, [navigate])
 
   const loadSessions = async () => {
@@ -265,6 +253,7 @@ export const ProfesorDashboard = () => {
 
   const handleApproveApplication = async (applicationId) => {
     setIsProcessingApp(true)
+    setApprovalsError('')
     try {
       const response = await profesorService.approveApplication(applicationId)
 
@@ -282,17 +271,11 @@ export const ProfesorDashboard = () => {
           isClosable: true,
         })
 
-        // Reload applications
-        loadApplications()
+        // Reload both applications and sessions to update enrolled count
+        await Promise.all([loadApplications(), loadSessions()])
       }
     } catch (error) {
-      toast({
-        title: 'Error approving application',
-        description: error.message || 'Failed to approve application',
-        status: 'error',
-        duration: 5,
-        isClosable: true,
-      })
+      setApprovalsError(error.message || 'Failed to approve application')
     } finally {
       setIsProcessingApp(false)
     }
@@ -326,11 +309,11 @@ export const ProfesorDashboard = () => {
           isClosable: true,
         })
 
-        // Reset and reload
+        // Reset and reload both applications and sessions
         setRejectReason('')
         setRejectErrors({})
         onRejectClose()
-        loadApplications()
+        await Promise.all([loadApplications(), loadSessions()])
       }
     } catch (error) {
       toast({
@@ -648,17 +631,52 @@ export const ProfesorDashboard = () => {
             <VStack spacing={4} align="stretch">
               {sessions.map((session) => (
                 <Box key={session.id} borderWidth={1} borderRadius="lg" p={6} bg="blue.50">
-                  <VStack align="start" spacing={3}>
-                    <HStack justify="space-between" w="full">
-                      <Heading size="sm">Session #{session.id}</Heading>
-                      <HStack spacing={2}>
-                        <Badge colorScheme="blue">Active</Badge>
+                  <VStack align="stretch" spacing={4}>
+                    {/* Top section: Info on left, Buttons on right */}
+                    <HStack justify="space-between" align="flex-start" w="full" spacing={6}>
+                      {/* Left: Enrolled Counter and Session Details */}
+                      <VStack align="start" spacing={4} flex={1}>
+                        <Box>
+                          <Text fontSize="sm" color="gray.600">Enrolled</Text>
+                          <Text fontSize="3xl" fontWeight="bold">{session.enrolledCount} / {session.limitaStudenti}</Text>
+                        </Box>
+                        <Grid templateColumns="repeat(5, 1fr)" gap={3} w="full">
+                          <GridItem>
+                            <Text fontSize="sm" color="gray.600">Start Date</Text>
+                            <Text fontWeight="bold" fontSize="sm">
+                              {new Date(session.dataInceput).toLocaleDateString()} {new Date(session.dataInceput).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </GridItem>
+                          <GridItem>
+                            <Text fontSize="sm" color="gray.600">End Date</Text>
+                            <Text fontWeight="bold" fontSize="sm">
+                              {new Date(session.dataSfarsit).toLocaleDateString()} {new Date(session.dataSfarsit).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </GridItem>
+                          <GridItem>
+                            <Text fontSize="sm" color="gray.600">Student Limit</Text>
+                            <Text fontWeight="bold" fontSize="sm">{session.limitaStudenti} students</Text>
+                          </GridItem>
+                          <GridItem>
+                            <Text fontSize="sm" color="gray.600">Session ID</Text>
+                            <Text fontWeight="bold" fontSize="sm">#{session.id}</Text>
+                          </GridItem>
+                          <GridItem>
+                            <Text fontSize="sm" color="gray.600">Status</Text>
+                            <Badge colorScheme="blue" mt={1} display="inline-block" fontSize="sm">ACTIVE</Badge>
+                          </GridItem>
+                        </Grid>
+                      </VStack>
+
+                      {/* Right: Buttons */}
+                      <VStack align="stretch" spacing={2} w="auto" minW="150px" marginTop={0}>
                         <Button
                           size="sm"
                           colorScheme="blue"
                           variant="outline"
                           onClick={() => handleToggleEnrolledStudents(session.id)}
                           isLoading={isLoadingEnrolled && expandedSessionId === session.id}
+                          w="full"
                         >
                           {expandedSessionId === session.id ? 'Hide' : 'Show'} Students
                         </Button>
@@ -669,33 +687,12 @@ export const ProfesorDashboard = () => {
                           onClick={() => handleTerminateSessionClick(session)}
                           isDisabled={session.enrolledCount > 0}
                           title={session.enrolledCount > 0 ? `Cannot delete session with ${session.enrolledCount} student(s) enrolled` : 'Click to terminate session'}
+                          w="full"
                         >
                           Terminate
                         </Button>
-                      </HStack>
+                      </VStack>
                     </HStack>
-                    <Grid templateColumns="repeat(4, 1fr)" gap={4} w="full">
-                      <GridItem>
-                        <Text fontSize="sm" color="gray.600">Start Date</Text>
-                        <Text fontWeight="bold">
-                          {new Date(session.dataInceput).toLocaleDateString()} {new Date(session.dataInceput).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                      </GridItem>
-                      <GridItem>
-                        <Text fontSize="sm" color="gray.600">End Date</Text>
-                        <Text fontWeight="bold">
-                          {new Date(session.dataSfarsit).toLocaleDateString()} {new Date(session.dataSfarsit).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                      </GridItem>
-                      <GridItem>
-                        <Text fontSize="sm" color="gray.600">Student Limit</Text>
-                        <Text fontWeight="bold">{session.limitaStudenti} students</Text>
-                      </GridItem>
-                      <GridItem>
-                        <Text fontSize="sm" color="gray.600">Enrolled</Text>
-                        <Text fontWeight="bold">{session.enrolledCount} / {session.limitaStudenti}</Text>
-                      </GridItem>
-                    </Grid>
 
                     {/* Enrolled Students Section */}
                     {expandedSessionId === session.id && (
@@ -747,6 +744,13 @@ export const ProfesorDashboard = () => {
         <Box>
           <Heading size="lg" mb={4}>Pending Applications ({applications.length})</Heading>
 
+          {approvalsError && (
+            <Alert status="error" borderRadius="md" mb={4}>
+              <AlertIcon />
+              {approvalsError}
+            </Alert>
+          )}
+
           {isLoadingApps ? (
             <HStack justify="center" py={8}>
               <Spinner />
@@ -775,6 +779,9 @@ export const ProfesorDashboard = () => {
 
                         <Box>
                           <Text fontSize="sm" fontWeight="bold" color="gray.700">Session Details:</Text>
+                          <Text fontSize="sm">
+                            Session ID: {application.sesiune.id}
+                          </Text>
                           <Text fontSize="sm">
                             Period: {new Date(application.sesiune.dataInceput).toLocaleDateString()} - {new Date(application.sesiune.dataSfarsit).toLocaleDateString()}
                           </Text>
