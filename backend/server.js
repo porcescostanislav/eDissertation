@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const dotenv = require('dotenv');
 const { initializePrisma, testDatabaseConnection } = require('./db');
 const { authMiddleware } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
@@ -9,8 +10,13 @@ const profesorRoutes = require('./routes/profesor');
 const studentRoutes = require('./routes/student');
 const applicationsRoutes = require('./routes/applications');
 
+// Load environment variables from .env file
+dotenv.config();
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -18,13 +24,17 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Enable CORS for development
-app.use(cors({
-  origin: 'http://localhost:5173',
+// Configure CORS based on environment
+const corsOptions = {
+  origin: NODE_ENV === 'production' 
+    ? FRONTEND_URL.split(',')
+    : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
