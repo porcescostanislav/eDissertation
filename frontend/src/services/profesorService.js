@@ -37,45 +37,60 @@ export const profesorService = {
   /**
    * Get professor's sessions
    */
+  /**
+   * Get professor's sessions
+   * @returns {Promise<Object>} Response with success status and sessions array
+   * @throws {Error} If request fails
+   */
   getSessions: async () => {
     try {
       const response = await profesorAPI.get('/profesor/sessions')
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to fetch sessions' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to fetch sessions')
     }
   },
 
   /**
    * Get session details
    * @param {number} sessionId - Session ID
+   * @returns {Promise<Object>} Response with success status and session data
+   * @throws {Error} If request fails
    */
   getSessionDetails: async (sessionId) => {
     try {
       const response = await profesorAPI.get(`/profesor/sessions/${sessionId}`)
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to fetch session details' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to fetch session details')
     }
   },
 
   /**
    * Update session
    * @param {number} sessionId - Session ID
-   * @param {object} data - Updated session data
+   * @param {Object} data - Updated session data (dataInceput, dataSfarsit, limitaStudenti)
+   * @returns {Promise<Object>} Response with success status and updated session data
+   * @throws {Error} If update fails
    */
   updateSession: async (sessionId, data) => {
     try {
       const response = await profesorAPI.put(`/profesor/sessions/${sessionId}`, data)
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to update session' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to update session')
     }
   },
 
   /**
    * Delete session
+   * Validates that session has no enrolled students before deletion
    * @param {number} sessionId - Session ID
+   * @returns {Promise<Object>} Response with success status
+   * @throws {Error} If deletion fails or session has enrolled students
    */
   deleteSession: async (sessionId) => {
     try {
@@ -88,20 +103,26 @@ export const profesorService = {
   },
 
   /**
-   * Get pending applications
+   * Get applications by status
+   * @param {string} [status='pending'] - Filter applications by status (pending, approved, rejected)
+   * @returns {Promise<Object>} Response with success status and applications array
+   * @throws {Error} If request fails
    */
   getApplications: async (status = 'pending') => {
     try {
       const response = await profesorAPI.get(`/profesor/applications?status=${status}`)
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to fetch applications' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to fetch applications')
     }
   },
 
   /**
    * Get application details
    * @param {number} applicationId - Application ID
+   * @returns {Promise<Object>} Response with success status and application data
+   * @throws {Error} If request fails
    */
   getApplicationDetails: async (applicationId) => {
     try {
@@ -114,7 +135,10 @@ export const profesorService = {
 
   /**
    * Approve an application
+   * Changes application status from pending to approved
    * @param {number} applicationId - Application ID
+   * @returns {Promise<Object>} Response with success status and updated application data
+   * @throws {Error} If approval fails or session capacity exceeded
    */
   approveApplication: async (applicationId) => {
     try {
@@ -131,8 +155,11 @@ export const profesorService = {
 
   /**
    * Reject an application
+   * Changes application status from pending to rejected
    * @param {number} applicationId - Application ID
-   * @param {string} justificare - Rejection justification
+   * @param {string} justificare - Rejection justification/reason
+   * @returns {Promise<Object>} Response with success status and updated application data
+   * @throws {Error} If rejection fails
    */
   rejectApplication: async (applicationId, justificare) => {
     try {
@@ -149,7 +176,10 @@ export const profesorService = {
 
   /**
    * Download unsigned template for application
+   * Generates a downloadable text file for student to sign and return
    * @param {number} applicationId - Application ID
+   * @returns {Promise<Object>} Response with success status
+   * @throws {Error} If download fails
    */
   downloadUnsignedTemplate: async (applicationId) => {
     try {
@@ -172,14 +202,18 @@ export const profesorService = {
       
       return { success: true }
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to download template' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to download template')
     }
   },
 
   /**
    * Upload response file for an approved application
+   * Professor uploads their response/feedback PDF for student review
    * @param {number} applicationId - Application ID
    * @param {File} file - PDF file to upload
+   * @returns {Promise<Object>} Response with success status and updated application data
+   * @throws {Error} If upload fails
    */
   uploadResponseFile: async (applicationId, file) => {
     try {
@@ -197,14 +231,19 @@ export const profesorService = {
       )
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to upload response file' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to upload response file')
     }
   },
 
   /**
    * Reject/unapprove an approved application
+   * Changes application status from approved back to rejected
+   * Clears the signed file when unapproving
    * @param {number} applicationId - Application ID
    * @param {string} justificare - Rejection reason
+   * @returns {Promise<Object>} Response with success status and updated application data
+   * @throws {Error} If rejection fails
    */
   unapproveApplication: async (applicationId, justificare) => {
     try {
@@ -214,12 +253,17 @@ export const profesorService = {
       )
       return response.data
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to reject application' }
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to reject application')
     }
   },
 
   /**
    * Get enrolled students for a specific session
+   * Retrieves list of all students who have been approved for the session
+   * @param {number} sessionId - Session ID
+   * @returns {Promise<Object>} Response with success status and enrolled students array
+   * @throws {Error} If request fails
    */
   getEnrolledStudents: async (sessionId) => {
     try {
@@ -227,7 +271,8 @@ export const profesorService = {
       return response.data
     } catch (error) {
       console.error('getEnrolledStudents error:', error)
-      throw error.response?.data || new Error(error.message || 'Failed to fetch enrolled students')
+      const errorData = error.response?.data
+      throw new Error(errorData?.message || error.message || 'Failed to fetch enrolled students')
     }
   },
 }

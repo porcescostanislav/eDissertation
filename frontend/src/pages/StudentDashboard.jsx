@@ -98,6 +98,11 @@ export const StudentDashboard = () => {
     }
   }
 
+  /**
+   * Opens the application submission modal for a session
+   * Validates that user hasn't already applied to this session
+   * @param {Object} session - The session object to apply to
+   */
   const handleApplyClick = (session) => {
     // Check if already applied to this session
     const hasApplied = applications.some(app => app.sesiuneId === session.id)
@@ -116,6 +121,10 @@ export const StudentDashboard = () => {
     onOpen()
   }
 
+  /**
+   * Submits an application to a selected session
+   * Reloads applications list after successful submission
+   */
   const handleSubmitApplication = async () => {
     if (!selectedSession) return
 
@@ -152,6 +161,11 @@ export const StudentDashboard = () => {
     }
   }
 
+  /**
+   * Returns the Chakra UI color scheme for application status
+   * @param {string} status - The application status (pending, approved, rejected)
+   * @returns {string} The color scheme name
+   */
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending':
@@ -165,6 +179,11 @@ export const StudentDashboard = () => {
     }
   }
 
+  /**
+   * Returns the human-readable label for application status
+   * @param {string} status - The application status (pending, approved, rejected)
+   * @returns {string} The formatted status label
+   */
   const getStatusLabel = (status) => {
     switch (status) {
       case 'approved':
@@ -178,10 +197,20 @@ export const StudentDashboard = () => {
     }
   }
 
+  /**
+   * Checks if student has already applied to a session
+   * @param {number} sessionId - The session ID to check
+   * @returns {boolean} True if student has an application to this session
+   */
   const hasAppliedToSession = (sessionId) => {
     return applications.some(app => app.sesiuneId === sessionId)
   }
 
+  /**
+   * Retrieves the application object for a specific session
+   * @param {number} sessionId - The session ID to look up
+   * @returns {Object|undefined} The application object or undefined if not found
+   */
   const getApplicationForSession = (sessionId) => {
     return applications.find(app => app.sesiuneId === sessionId)
   }
@@ -191,12 +220,20 @@ export const StudentDashboard = () => {
     navigate('/login')
   }
 
+  /**
+   * Opens the file upload modal for a signed dissertation file
+   * @param {Object} application - The approved application to upload for
+   */
   const handleUploadSignedFile = (application) => {
     setSelectedApplicationForUpload(application)
     setUploadFile(null)
     onUploadOpen()
   }
 
+  /**
+   * Handles file selection with PDF validation
+   * @param {Event} event - The file input change event
+   */
   const handleFileChange = (event) => {
     const file = event.target.files?.[0]
     if (file) {
@@ -215,6 +252,10 @@ export const StudentDashboard = () => {
     }
   }
 
+  /**
+   * Submits the selected signed file for an approved application
+   * Validates file selection and reloads applications after upload
+   */
   const handleSubmitSignedFile = async () => {
     if (!selectedApplicationForUpload || !uploadFile) {
       toast({

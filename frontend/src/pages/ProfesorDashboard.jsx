@@ -244,6 +244,10 @@ export const ProfesorDashboard = () => {
     return errors
   }
 
+  /**
+   * Opens the rejection modal for a pending application
+   * @param {Object} application - The application object to reject
+   */
   const handleRejectClick = (application) => {
     setSelectedApplication(application)
     setRejectReason('')
@@ -251,6 +255,11 @@ export const ProfesorDashboard = () => {
     onRejectOpen()
   }
 
+  /**
+   * Approves a pending application
+   * Reloads both applications and sessions to update enrolled count in real-time
+   * @param {number} applicationId - The ID of the application to approve
+   */
   const handleApproveApplication = async (applicationId) => {
     setIsProcessingApp(true)
     setApprovalsError('')
@@ -281,6 +290,11 @@ export const ProfesorDashboard = () => {
     }
   }
 
+  /**
+   * Rejects a pending application with validation
+   * Validates rejection reason before submission
+   * Reloads both applications and sessions to update enrolled count
+   */
   const handleRejectApplication = async () => {
     const errors = validateRejectReason()
     if (Object.keys(errors).length > 0) {
@@ -328,11 +342,18 @@ export const ProfesorDashboard = () => {
     }
   }
 
+  /**
+   * Logs out the current user and redirects to login
+   */
   const handleLogout = () => {
     authService.logout()
     navigate('/login')
   }
 
+  /**
+   * Opens the session termination confirmation modal
+   * @param {Object} session - The session to terminate
+   */
   const handleTerminateSessionClick = (session) => {
     setSelectedSessionForTerminate(session)
     onTerminateOpen()
