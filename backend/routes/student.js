@@ -96,7 +96,13 @@ router.post('/applications', authMiddleware, studentOnly, async (req, res) => {
       where: { id: sessionId },
       include: {
         _count: {
-          select: { cerereDisertatie: true },
+          select: { 
+            cerereDisertatie: {
+              where: {
+                status: 'approved' // Only count approved applications as enrolled
+              }
+            }
+          },
         },
       },
     });
@@ -136,7 +142,7 @@ router.post('/applications', authMiddleware, studentOnly, async (req, res) => {
     if (session._count.cerereDisertatie >= session.limitaStudenti) {
       return res.status(409).json({
         success: false,
-        message: `Session is full (${session.limitaStudenti}/${session.limitaStudenti} slots)`,
+        message: `Session is full (${session._count.cerereDisertatie}/${session.limitaStudenti} slots)`,
       });
     }
 

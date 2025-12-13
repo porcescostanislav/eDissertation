@@ -207,7 +207,13 @@ router.get('/sessions', authMiddleware, profesorOnly, async (req, res) => {
       where,
       include: {
         _count: {
-          select: { cerereDisertatie: true },
+          select: { 
+            cerereDisertatie: {
+              where: {
+                status: 'approved' // Only count approved applications as enrolled
+              }
+            }
+          },
         },
       },
       orderBy: {
@@ -526,7 +532,13 @@ router.delete('/sessions/:id', authMiddleware, profesorOnly, async (req, res) =>
       where: { id: sessionId },
       include: {
         _count: {
-          select: { cerereDisertatie: true },
+          select: { 
+            cerereDisertatie: {
+              where: {
+                status: 'approved' // Only count approved applications as enrolled
+              }
+            }
+          },
         },
       },
     });
