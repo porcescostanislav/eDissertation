@@ -5,10 +5,12 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 const { initializePrisma, testDatabaseConnection } = require('./db');
 const { authMiddleware } = require('./middleware/auth');
+const { initializeScheduler } = require('./src/jobs');
 const authRoutes = require('./routes/auth');
 const profesorRoutes = require('./routes/profesor');
 const studentRoutes = require('./routes/student');
 const applicationsRoutes = require('./routes/applications');
+const adminJobsRoutes = require('./src/routes/admin-jobs');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -53,6 +55,9 @@ app.use('/api/student', studentRoutes);
 // Applications routes (protected - professor)
 app.use('/api/profesor', applicationsRoutes);
 
+// Admin jobs management routes (protected)
+app.use('/api/admin/jobs', adminJobsRoutes);
+
 // Database connection test endpoint
 app.get('/api/status', async (req, res) => {
   try {
@@ -95,37 +100,52 @@ async function startServer() {
   try {
     console.log('Starting server...');
     
-    app.listen(PORT, () => {
-      console.log(`✓ Server is running on http://localhost:${PORT}`);
-      console.log(`✓ Health endpoint: http://localhost:${PORT}/health`);
-      console.log(`✓ Auth endpoints:`);
+    app.listen(PORT, async () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+      console.log(`Health endpoint: http://localhost:${PORT}/health`);
+      console.log(`Auth endpoints:`);
       console.log(`  - POST /api/auth/register`);
       console.log(`  - POST /api/auth/login`);
-      console.log(`✓ Professor endpoints (protected):`);
+      console.log(`Professor endpoints (protected):`);
       console.log(`  - POST /api/profesor/sessions (create session)`);
       console.log(`  - GET /api/profesor/sessions (list sessions)`);
       console.log(`  - GET /api/profesor/sessions/:id (get session)`);
       console.log(`  - PUT /api/profesor/sessions/:id (update session)`);
       console.log(`  - DELETE /api/profesor/sessions/:id (delete session)`);
-      console.log(`✓ Professor application endpoints (protected):`);
+      console.log(`Professor application endpoints (protected):`);
       console.log(`  - GET /api/profesor/applications (list applications)`);
       console.log(`  - GET /api/profesor/applications/:id (get application)`);
       console.log(`  - PATCH /api/profesor/applications/:id/approve (approve)`);
       console.log(`  - PATCH /api/profesor/applications/:id/reject (reject)`);
-      console.log(`✓ Student endpoints (protected):`);
+      console.log(`Student endpoints (protected):`);
       console.log(`  - POST /api/student/applications (submit application)`);
       console.log(`  - GET /api/student/applications (list applications)`);
       console.log(`  - GET /api/student/applications/:id (get application)`);
       console.log(`  - GET /api/student/sessions (list available sessions)`);
       console.log(`  - POST /api/student/applications/:id/upload-signed (upload signed file)`);
-      console.log(`✓ Protected endpoint: GET /api/me (requires auth)`);
+      console.log(`Protected endpoint: GET /api/me (requires auth)`);
+      console.log(`Admin job management endpoints (protected):`);
+      console.log(`  - GET /api/admin/jobs/status (get scheduler status)`);
+      console.log(`  - GET /api/admin/jobs/cleanup/status (cleanup job status)`);
+      console.log(`  - GET /api/admin/jobs/cleanup/validate (validate config)`);
+      console.log(`  - POST /api/admin/jobs/cleanup/trigger (manually trigger cleanup)`);
+
+      // Initialize background job scheduler after server starts
+      try {
+        console.log('\nInitializing background job scheduler...');
+        await initializeScheduler();
+        console.log('✓ Background job scheduler initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize background job scheduler:', error.message);
+        console.log('Server will continue running, but cleanup jobs will not execute automatically');
+      }
     });
 
     // Try to initialize Prisma (non-blocking)
     console.log('\nAttempting database connection...');
     await initializePrisma();
   } catch (error) {
-    console.log('⚠ Database connection failed (server will run without database)');
+    console.log('Database connection failed (server will run without database)');
     console.log('Error:', error.message);
   }
 }
