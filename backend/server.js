@@ -6,14 +6,18 @@ const dotenv = require('dotenv');
 const { initializePrisma, testDatabaseConnection } = require('./db');
 const { authMiddleware } = require('./middleware/auth');
 const { initializeScheduler } = require('./src/jobs');
-const authRoutes = require('./routes/auth');
-const profesorRoutes = require('./routes/profesor');
-const studentRoutes = require('./routes/student');
-const applicationsRoutes = require('./routes/applications');
-const adminJobsRoutes = require('./src/routes/admin-jobs');
 
 // Load environment variables from .env file
 dotenv.config();
+
+// Validate required environment variables
+const requiredEnvVars = ['JWT_SECRET', 'DATABASE_URL'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,21 +31,31 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Configure CORS based on environment
+const corsOrigins = NODE_ENV === 'production' 
+  ? FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'];
+
 const corsOptions = {
-  origin: NODE_ENV === 'production' 
-    ? FRONTEND_URL.split(',')
-    : ['http://localhost:5173', 'http://localhost:3000'],
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
-
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Import routes - case-sensitive paths
+const authRoutes = require('./routes/auth');
+const profesorRoutes = require('./routes/profesor');
+const studentRoutes = require('./routes/student');
+const applicationsRoutes = require('./routes/applications');
+const adminJobsRoutes = require('./src/routes/admin-jobs');
 
 // Auth routes (public)
 app.use('/api/auth', authRoutes);
@@ -64,20 +78,24 @@ app.get('/api/status', async (req, res) => {
     const isConnected = await testDatabaseConnection();
     res.json({ 
       status: 'Running',
-      database: isConnected ? 'Connected' : 'Disconnected'
+      database: isConnected ? 'Connected' : 'Disconnected',
+      environment: NODE_ENV,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(200).json({ 
       status: 'Running',
       database: 'Disconnected',
-      error: error.message 
+      environment: NODE_ENV,
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-// Health check endpoint
+// Health check endpoint (for Heroku router)
 app.get('/health', (req, res) => {
-  res.json({ health: 'ok' });
+  res.json({ health: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Protected route example
@@ -95,59 +113,119 @@ app.get('/api/me', authMiddleware, async (req, res) => {
   }
 });
 
-// Start server
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: NODE_ENV === 'production' ? 'Internal server error' : err.message,
+    error: NODE_ENV === 'production' ? undefined : err
+  });
+});
+
+// Start server with graceful shutdown
+let server;
+
 async function startServer() {
   try {
-    console.log('Starting server...');
+    console.log('🚀 Starting server...');
+    console.log(`📍 Environment: ${NODE_ENV}`);
+    console.log(`🔌 Port: ${PORT}`);
     
-    app.listen(PORT, async () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-      console.log(`Health endpoint: http://localhost:${PORT}/health`);
-      console.log(`Auth endpoints:`);
-      console.log(`  - POST /api/auth/register`);
-      console.log(`  - POST /api/auth/login`);
-      console.log(`Professor endpoints (protected):`);
-      console.log(`  - POST /api/profesor/sessions (create session)`);
-      console.log(`  - GET /api/profesor/sessions (list sessions)`);
-      console.log(`  - GET /api/profesor/sessions/:id (get session)`);
-      console.log(`  - PUT /api/profesor/sessions/:id (update session)`);
-      console.log(`  - DELETE /api/profesor/sessions/:id (delete session)`);
-      console.log(`Professor application endpoints (protected):`);
-      console.log(`  - GET /api/profesor/applications (list applications)`);
-      console.log(`  - GET /api/profesor/applications/:id (get application)`);
-      console.log(`  - PATCH /api/profesor/applications/:id/approve (approve)`);
-      console.log(`  - PATCH /api/profesor/applications/:id/reject (reject)`);
-      console.log(`Student endpoints (protected):`);
-      console.log(`  - POST /api/student/applications (submit application)`);
-      console.log(`  - GET /api/student/applications (list applications)`);
-      console.log(`  - GET /api/student/applications/:id (get application)`);
-      console.log(`  - GET /api/student/sessions (list available sessions)`);
-      console.log(`  - POST /api/student/applications/:id/upload-signed (upload signed file)`);
-      console.log(`Protected endpoint: GET /api/me (requires auth)`);
-      console.log(`Admin job management endpoints (protected):`);
-      console.log(`  - GET /api/admin/jobs/status (get scheduler status)`);
-      console.log(`  - GET /api/admin/jobs/cleanup/status (cleanup job status)`);
-      console.log(`  - GET /api/admin/jobs/cleanup/validate (validate config)`);
-      console.log(`  - POST /api/admin/jobs/cleanup/trigger (manually trigger cleanup)`);
+    // Try to initialize Prisma (non-blocking)
+    console.log('\n🗄️  Attempting database connection...');
+    try {
+      await initializePrisma();
+      console.log('✅ Database connection successful');
+    } catch (error) {
+      console.warn('⚠️  Database connection failed:', error.message);
+      console.log('   Server will continue running without database');
+    }
+
+    server = app.listen(PORT, '0.0.0.0', async () => {
+      console.log(`\n✅ Server is running on http://0.0.0.0:${PORT}`);
+      console.log(`📍 Health check: GET http://localhost:${PORT}/health`);
+      console.log(`📊 Status endpoint: GET http://localhost:${PORT}/api/status`);
+      console.log(`\n📋 Available endpoints:`);
+      console.log(`  Auth (public):`);
+      console.log(`    - POST /api/auth/register`);
+      console.log(`    - POST /api/auth/login`);
+      console.log(`  Professor (protected):`);
+      console.log(`    - POST /api/profesor/sessions`);
+      console.log(`    - GET /api/profesor/sessions`);
+      console.log(`    - GET /api/profesor/sessions/:id`);
+      console.log(`    - PUT /api/profesor/sessions/:id`);
+      console.log(`    - DELETE /api/profesor/sessions/:id`);
+      console.log(`  Applications (protected):`);
+      console.log(`    - GET /api/profesor/applications`);
+      console.log(`    - GET /api/profesor/applications/:id`);
+      console.log(`    - PATCH /api/profesor/applications/:id/approve`);
+      console.log(`    - PATCH /api/profesor/applications/:id/reject`);
+      console.log(`  Student (protected):`);
+      console.log(`    - POST /api/student/applications`);
+      console.log(`    - GET /api/student/applications`);
+      console.log(`    - GET /api/student/applications/:id`);
+      console.log(`    - GET /api/student/sessions`);
+      console.log(`    - POST /api/student/applications/:id/upload-signed`);
+      console.log(`  Admin Jobs (protected):`);
+      console.log(`    - GET /api/admin/jobs/status`);
+      console.log(`    - GET /api/admin/jobs/cleanup/status`);
+      console.log(`    - GET /api/admin/jobs/cleanup/validate`);
+      console.log(`    - POST /api/admin/jobs/cleanup/trigger\n`);
 
       // Initialize background job scheduler after server starts
       try {
-        console.log('\nInitializing background job scheduler...');
+        console.log('⏰ Initializing background job scheduler...');
         await initializeScheduler();
-        console.log('✓ Background job scheduler initialized successfully');
+        console.log('✅ Background job scheduler initialized successfully\n');
       } catch (error) {
-        console.error('Failed to initialize background job scheduler:', error.message);
-        console.log('Server will continue running, but cleanup jobs will not execute automatically');
+        console.warn('⚠️  Failed to initialize scheduler:', error.message);
+        console.log('   Cleanup jobs will not execute automatically\n');
       }
     });
-
-    // Try to initialize Prisma (non-blocking)
-    console.log('\nAttempting database connection...');
-    await initializePrisma();
   } catch (error) {
-    console.log('Database connection failed (server will run without database)');
-    console.log('Error:', error.message);
+    console.error('❌ Fatal error starting server:', error.message);
+    process.exit(1);
   }
 }
+
+// Graceful shutdown handlers
+const gracefulShutdown = async (signal) => {
+  console.log(`\n${signal} received, shutting down gracefully...`);
+  if (server) {
+    server.close(async () => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+    // Force exit after 30 seconds
+    setTimeout(() => {
+      console.error('Forced shutdown due to timeout');
+      process.exit(1);
+    }, 30000);
+  } else {
+    process.exit(0);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
 
 startServer();

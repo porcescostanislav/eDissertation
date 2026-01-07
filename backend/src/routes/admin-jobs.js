@@ -1,26 +1,26 @@
 /**
- * Admin Jobs API Routes
+ * Jobs API Routes
  * 
  * Protected endpoints for managing background jobs
- * Only accessible to authenticated users (can be extended to admin role)
+ * All endpoints require authentication. Can be extended to require admin role.
  * 
  * Endpoints:
- * - GET /api/admin/jobs/status - Get scheduler status
- * - POST /api/admin/jobs/cleanup/trigger - Manually trigger cleanup
- * - GET /api/admin/jobs/cleanup/status - Get cleanup job configuration
- * - GET /api/admin/jobs/cleanup/validate - Validate cleanup configuration
+ * - GET /api/admin/jobs/status - Get overall scheduler status
+ * - GET /api/admin/jobs/cleanup/status - Get cleanup job configuration and status
+ * - GET /api/admin/jobs/cleanup/validate - Validate cleanup job configuration
+ * - POST /api/admin/jobs/cleanup/trigger - Manually trigger cleanup job
+ * - POST /api/admin/jobs/initialize - Initialize the job scheduler
  */
 
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../../middleware/auth');
 const {
-  initializeScheduler,
   getSchedulerStatus,
-  triggerCleanupJobManually,
   getCleanupJobStatus,
   validateCleanupConfig,
-  executeCleanupJob
+  triggerCleanupJobManually,
+  initializeScheduler
 } = require('../jobs');
 
 /**
